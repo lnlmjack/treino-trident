@@ -176,7 +176,8 @@
 
         let response;
         try {
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            // Atualizado para o modelo mais recente suportado para gerar JSON
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -185,7 +186,7 @@
                 })
             });
         } catch (fetchError) {
-            throw new Error("Falha na rede. Verifique sua conexão com a internet ou pause bloqueadores de anúncio (AdBlock/Brave Shields). O bloqueador pode estar barrando a API do Google.");
+            throw new Error("Falha na rede. Verifique sua conexão com a internet ou pause bloqueadores de anúncio (AdBlock/Brave Shields).");
         }
 
         const data = await response.json();
@@ -218,6 +219,7 @@
             return fetchChallengeWithValidation(apiKey); 
         }
 
+        // Validador embutido contra alucinações de letras
         if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
             document.getElementById('loading').innerText = 'Mentalizando... (Corrigindo erro da IA)';
             return fetchChallengeWithValidation(apiKey); 
