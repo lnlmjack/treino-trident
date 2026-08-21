@@ -74,7 +74,7 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando... (Conectando à IA)</div>
+        <div id="loading">Mentalizando... (Procurando IA gratuita)</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -150,14 +150,14 @@
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'Mentalizando... (Conectando à IA)';
+        document.getElementById('loading').innerText = 'Mentalizando... (Procurando IA gratuita)';
         document.getElementById('guess-input').value = '';
 
         try {
             await fetchChallengeWithValidation(apiKey);
         } catch (error) {
             console.error(error);
-            alert("ERRO DETALHADO:\n" + error.message + "\n\nSe o erro continuar, mande um print desta mensagem inteira.");
+            alert("ERRO DETALHADO:\n" + error.message);
             document.getElementById('btn-generate').classList.remove('hidden');
             document.getElementById('loading').style.display = 'none';
         }
@@ -174,43 +174,68 @@
         
         Não retorne absolutamente nada além do JSON estrito.`;
 
+        let targetModel = "gemini-1.5-flash"; 
+        
+        try {
+            const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            const listData = await listResp.json();
+            
+            if (listData.models) {
+                const validModels = listData.models.filter(m => m.name.includes("gemini") && m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                
+                // MUDANÇA: Força o sistema a procurar e usar APENAS as versões 'flash' (que possuem cota gratuita)
+                const flashModels = validModels.filter(m => m.name.includes("flash"));
+                
+                if (flashModels.length > 0) {
+                    targetModel = flashModels[0].name.replace('models/', '');
+                } else if (validModels.length > 0) {
+                    targetModel = validModels[0].name.replace('models/', '');
+                }
+            }
+        } catch(e) {
+            console.log("Modo autônomo falhou, usando padrão.");
+        }
+
+        document.getElementById('loading').innerText = `Conectado via: ${targetModel}...`;
+
         let response;
         try {
-            // MUDANÇA CRUCIAL: Utilizando o modelo universal 'gemini-pro' (1.0) que funciona em todas as contas
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { response_mime_type: "application/json" }
                 })
             });
         } catch (fetchError) {
-            throw new Error("Falha na rede. Verifique sua conexão com a internet ou pause bloqueadores de anúncio (AdBlock/Brave Shields).");
+            throw new Error("Falha na rede. Verifique sua internet ou desligue bloqueadores de anúncio.");
         }
 
         const data = await response.json();
         
         if (data.error) {
             if (data.error.message.includes("API key not valid")) {
-                 throw new Error("A chave da API está inválida. Verifique se você copiou corretamente sem espaços em branco nas pontas.");
+                 throw new Error("A chave da API está inválida.");
             }
-            throw new Error("Erro direto do Google: " + data.error.message);
+            if (data.error.message.includes("Quota exceeded")) {
+                 throw new Error(`O Google bloqueou por falta de cota gratuita neste modelo (${targetModel}).`);
+            }
+            throw new Error(`Erro do Google (${targetModel}): ` + data.error.message);
         }
 
         if (!data.candidates || data.candidates.length === 0) {
-            throw new Error("A API respondeu, mas não trouxe as palavras. Tente gerar novamente.");
+            throw new Error("A API não enviou palavras. Tente gerar novamente.");
         }
 
         let jsonText = data.candidates[0].content.parts[0].text;
-        
-        // Limpeza rigorosa caso a IA mande formatação de bloco de código
         jsonText = jsonText.replace(/```json/gi, '').replace(/```/gi, '').trim();
         
         let challengeData;
         try {
             challengeData = JSON.parse(jsonText);
         } catch (parseError) {
-            throw new Error("A IA tentou responder, mas errou o formato do JSON. Tente gerar novamente.");
+            throw new Error("A IA embaralhou o formato. Tente gerar novamente.");
         }
 
         const pmNorm = normalizeString(challengeData.palavra_mestre);
