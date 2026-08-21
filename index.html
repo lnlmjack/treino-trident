@@ -74,7 +74,7 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando... (Conectando ao modelo de 2026)</div>
+        <div id="loading">Mentalizando... (Conectando ao Gemini 3.6 Flash)</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -176,8 +176,8 @@
 
         let response;
         try {
-            // UTILIZANDO O MODELO DE 2026 EXIGIDO PELO GOOGLE
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+            // CONEXÃO DIRETA COM O MODELO GEMINI 3.6 FLASH NA API OFICIAL (v1)
+            response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
