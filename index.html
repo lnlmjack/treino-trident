@@ -20,12 +20,12 @@
         .container { width: 100%; max-width: 500px; }
         
         .card { background-color: var(--panel-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .stats { display: flex; justify-content: space-between; margin-top: 5px; text-align: center; }
+        .stats { display: flex; justify-content: space-between; margin-top: 15px; text-align: center; }
         .stat-box { flex: 1; padding: 10px; }
         .stat-value { font-size: 24px; font-weight: bold; }
         .stat-label { font-size: 12px; color: #a8a8b3; text-transform: uppercase; }
         
-        input[type="text"] { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid #323238; background: #121214; color: white; font-size: 16px; margin-bottom: 15px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid #323238; background: #121214; color: white; font-size: 16px; margin-bottom: 15px; }
         input[type="text"]:focus { outline: 1px solid var(--primary); }
         button { width: 100%; padding: 15px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 10px; color: white; }
         .btn-primary { background-color: var(--primary); }
@@ -42,13 +42,19 @@
         .hidden { display: none !important; }
         .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; text-align: center; }
         .feedback-breakdown { font-size: 14px; color: #a8a8b3; margin-top: 10px; text-align: left; line-height: 1.6; }
+        .reset-btn { background: none; color: #a8a8b3; border: 1px solid #323238; font-size: 12px; padding: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- Placar -->
-    <div class="card" id="score-panel">
+    <div class="card" id="config-panel">
+        <h2>Configuração da API</h2>
+        <input type="password" id="api-key" placeholder="Cole sua chave do Gemini aqui">
+        <button class="btn-primary" onclick="saveApiKey()">Salvar e Começar</button>
+    </div>
+
+    <div class="card hidden" id="score-panel">
         <div class="stats">
             <div class="stat-box" style="color: var(--success);">
                 <div class="stat-value" id="score-hits">0</div>
@@ -63,10 +69,10 @@
                 <div class="stat-label">Não Sei</div>
             </div>
         </div>
+        <button class="reset-btn" onclick="resetApiKey()">Trocar Chave API</button>
     </div>
 
-    <!-- Área de Jogo -->
-    <div class="card" id="game-panel">
+    <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
         <div id="loading">Mentalizando... (Validando dados)</div>
         
@@ -84,17 +90,41 @@
 </div>
 
 <script>
-    // ==========================================
-    // COLOQUE SUA CHAVE AQUI DENTRO DAS ASPAS:
-    const MINHA_CHAVE_API = "AQ.Ab8RN6LjNH096krsq8WGTJ9NFJipeuNgrDFXycy7kAeHUuEW0Q";
-    // ==========================================
-
     let currentChallenge = null;
     let scores = { hits: 0, misses: 0, reveals: 0 };
 
     window.onload = () => {
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) {
+            document.getElementById('api-key').value = savedKey;
+            showGame();
+        }
         loadScores();
     };
+
+    function saveApiKey() {
+        const key = document.getElementById('api-key').value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            showGame();
+        } else {
+            alert('Por favor, insira uma chave válida.');
+        }
+    }
+
+    function resetApiKey() {
+        localStorage.removeItem('gemini_api_key');
+        document.getElementById('config-panel').classList.remove('hidden');
+        document.getElementById('score-panel').classList.add('hidden');
+        document.getElementById('game-panel').classList.add('hidden');
+        document.getElementById('api-key').value = '';
+    }
+
+    function showGame() {
+        document.getElementById('config-panel').classList.add('hidden');
+        document.getElementById('score-panel').classList.remove('hidden');
+        document.getElementById('game-panel').classList.remove('hidden');
+    }
 
     function loadScores() {
         const savedScores = JSON.parse(localStorage.getItem('trident_scores'));
@@ -114,6 +144,7 @@
     }
 
     async function generateChallenge() {
+        const apiKey = localStorage.getItem('gemini_api_key');
         document.getElementById('btn-generate').classList.add('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
@@ -121,16 +152,16 @@
         document.getElementById('guess-input').value = '';
 
         try {
-            await fetchChallengeWithValidation();
+            await fetchChallengeWithValidation(apiKey);
         } catch (error) {
             console.error(error);
-            alert("Erro de conexão com o Gemini. Detalhe: " + error.message);
+            alert("Erro de conexão. Verifique sua API Key ou tente novamente.");
             document.getElementById('btn-generate').classList.remove('hidden');
             document.getElementById('loading').style.display = 'none';
         }
     }
 
-    async function fetchChallengeWithValidation() {
+    async function fetchChallengeWithValidation(apiKey) {
         const prompt = `Atue como um espectador no truque de mentalismo TRIDENT. 
         Gere um objeto JSON estrito com os seguintes campos, todos em português do Brasil:
         - "palavra_mestre": Um substantivo simples, um objeto que possa ser visualizado. (Ex: Cadeira, Violão, Elefante, Maçã).
@@ -141,7 +172,7 @@
         
         Não retorne nada além do JSON.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MINHA_CHAVE_API}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -153,10 +184,11 @@
         const data = await response.json();
         
         if (data.error) {
-            throw new Error(data.error.message);
+            throw new Error("Erro da API: " + data.error.message);
         }
 
         let jsonText = data.candidates[0].content.parts[0].text;
+        
         jsonText = jsonText.replace(/```json/gi, '').replace(/```/gi, '').trim();
         
         let challengeData = JSON.parse(jsonText);
@@ -165,10 +197,9 @@
         const p1Norm = normalizeString(challengeData.pista_1);
         const p2Norm = normalizeString(challengeData.pista_2);
 
-        // O árbitro de validação
         if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
             console.log("A IA alucinou uma letra. Recalculando...");
-            return fetchChallengeWithValidation(); 
+            return fetchChallengeWithValidation(apiKey); 
         }
 
         currentChallenge = challengeData;
@@ -232,8 +263,8 @@
                 <strong>Palavra-Mestre:</strong> ${c.palavra_mestre.toUpperCase()} <br><br>
                 <strong>Lógica (Script TRIDENT):</strong><br>
                 • <em>Categoria (${c.categoria}):</em> ${c.item_categoria}<br>
-                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Longa):</em> ${c.pista_1}<br>
-                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Curta):</em> ${c.pista_2}
+                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Longa/Interessante):</em> ${c.pista_1}<br>
+                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Curta/Breve):</em> ${c.pista_2}
             </div>
         `;
     }
