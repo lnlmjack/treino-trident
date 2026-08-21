@@ -157,7 +157,7 @@
             await fetchChallengeWithValidation(apiKey);
         } catch (error) {
             console.error(error);
-            alert("ERRO DETALHADO:\n" + error.message + "\n\nSe o erro continuar, me mande um print desta mensagem.");
+            alert("ERRO DETALHADO:\n" + error.message + "\n\nSe o erro continuar, mande um print desta mensagem inteira.");
             document.getElementById('btn-generate').classList.remove('hidden');
             document.getElementById('loading').style.display = 'none';
         }
@@ -176,8 +176,8 @@
 
         let response;
         try {
-            // Forçando o modelo PRO na API V1 (o mais estável e universal possível)
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+            // MUDANÇA CRUCIAL: Utilizando o endpoint 'v1' oficial em vez do 'v1beta'
+            response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -194,6 +194,20 @@
         if (data.error) {
             if (data.error.message.includes("API key not valid")) {
                  throw new Error("A chave da API está inválida. Verifique se você copiou corretamente sem espaços em branco nas pontas.");
+            }
+            // O RASTREADOR: Se o modelo falhar de novo, ele busca a lista dos modelos permitidos na sua conta.
+            if (data.error.message.includes("is not found") || data.error.message.includes("not supported")) {
+                try {
+                    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
+                    const listData = await listResp.json();
+                    let available = "Não foi possível listar os modelos.";
+                    if (listData.models) {
+                        available = listData.models.filter(m => m.name.includes("gemini")).map(m => m.name.replace('models/', '')).join(", ");
+                    }
+                    throw new Error(`Google bloqueou o modelo. Modelos que você tem acesso: ${available}`);
+                } catch(e) {
+                    throw new Error("Erro direto do Google: " + data.error.message);
+                }
             }
             throw new Error("Erro direto do Google: " + data.error.message);
         }
