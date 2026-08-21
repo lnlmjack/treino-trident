@@ -74,7 +74,7 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando... (Conectando à IA)</div>
+        <div id="loading">Mentalizando... (Procurando IA na sua conta)</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -150,7 +150,7 @@
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'Mentalizando... (Conectando à IA)';
+        document.getElementById('loading').innerText = 'Mentalizando... (Procurando IA)';
         document.getElementById('guess-input').value = '';
 
         try {
@@ -174,10 +174,34 @@
         
         Não retorne nada além do JSON.`;
 
+        let targetModel = "gemini-1.5-flash"; // Padrão de segurança
+        
+        // MODO AUTÔNOMO: Pergunta ao Google quais modelos existem na sua chave
+        try {
+            const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            const listData = await listResp.json();
+            
+            if (listData.models) {
+                const validModels = listData.models.filter(m => m.name.includes("gemini") && m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                
+                let chosen = validModels.find(m => m.name.includes("1.5-flash"));
+                if (!chosen) chosen = validModels.find(m => m.name.includes("1.5-pro"));
+                if (!chosen) chosen = validModels.find(m => m.name.includes("gemini-pro"));
+                if (!chosen && validModels.length > 0) chosen = validModels[0];
+                
+                if (chosen) {
+                    targetModel = chosen.name.replace('models/', '');
+                }
+            }
+        } catch(e) {
+            console.log("Modo autônomo falhou, usando padrão.");
+        }
+
+        document.getElementById('loading').innerText = `Conectado via: ${targetModel}...`;
+
         let response;
         try {
-            // MUDANÇA CRUCIAL: Utilizando o endpoint 'v1' oficial em vez do 'v1beta'
-            response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -186,34 +210,20 @@
                 })
             });
         } catch (fetchError) {
-            throw new Error("Falha na rede. Verifique sua conexão com a internet ou pause bloqueadores de anúncio (AdBlock/Brave Shields).");
+            throw new Error("Falha na rede. Verifique sua internet ou desligue os bloqueadores de anúncio (AdBlock/Brave).");
         }
 
         const data = await response.json();
         
         if (data.error) {
             if (data.error.message.includes("API key not valid")) {
-                 throw new Error("A chave da API está inválida. Verifique se você copiou corretamente sem espaços em branco nas pontas.");
+                 throw new Error("A chave da API está inválida. Cole ela novamente sem espaços nas pontas.");
             }
-            // O RASTREADOR: Se o modelo falhar de novo, ele busca a lista dos modelos permitidos na sua conta.
-            if (data.error.message.includes("is not found") || data.error.message.includes("not supported")) {
-                try {
-                    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
-                    const listData = await listResp.json();
-                    let available = "Não foi possível listar os modelos.";
-                    if (listData.models) {
-                        available = listData.models.filter(m => m.name.includes("gemini")).map(m => m.name.replace('models/', '')).join(", ");
-                    }
-                    throw new Error(`Google bloqueou o modelo. Modelos que você tem acesso: ${available}`);
-                } catch(e) {
-                    throw new Error("Erro direto do Google: " + data.error.message);
-                }
-            }
-            throw new Error("Erro direto do Google: " + data.error.message);
+            throw new Error(`Erro do Google (${targetModel}): ` + data.error.message);
         }
 
         if (!data.candidates || data.candidates.length === 0) {
-            throw new Error("A API respondeu, mas não trouxe as palavras. Tente gerar novamente.");
+            throw new Error("A API respondeu, mas não trouxe palavras. Clique em Gerar novamente.");
         }
 
         let jsonText = data.candidates[0].content.parts[0].text;
@@ -222,7 +232,7 @@
         try {
             challengeData = JSON.parse(jsonText);
         } catch (parseError) {
-            throw new Error("A IA tentou responder, mas errou o formato do JSON. Tente gerar novamente.");
+            throw new Error("A IA embaralhou o formato. Clique em Gerar novamente.");
         }
 
         const pmNorm = normalizeString(challengeData.palavra_mestre);
