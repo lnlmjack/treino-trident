@@ -176,8 +176,8 @@
 
         let response;
         try {
-            // Atualizado para o modelo mais recente suportado para gerar JSON
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+            // Forçando o modelo PRO na API V1 (o mais estável e universal possível)
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -219,7 +219,6 @@
             return fetchChallengeWithValidation(apiKey); 
         }
 
-        // Validador embutido contra alucinações de letras
         if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
             document.getElementById('loading').innerText = 'Mentalizando... (Corrigindo erro da IA)';
             return fetchChallengeWithValidation(apiKey); 
