@@ -30,6 +30,8 @@
         button { width: 100%; padding: 15px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 10px; color: white; }
         .btn-primary { background-color: var(--primary); }
         .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-secondary { background-color: #323238; }
+        .btn-secondary:hover { background-color: #404048; }
         .btn-success { background-color: var(--success); }
         .btn-warning { background-color: var(--warning); }
         .btn-danger { background-color: var(--danger); }
@@ -69,12 +71,13 @@
                 <div class="stat-label">Não Sei</div>
             </div>
         </div>
-        <button class="reset-btn" onclick="resetApiKey()">Trocar Chave API</button>
+        <button class="btn-secondary" onclick="showHistory()" style="margin-top: 15px;">📜 Ver Histórico de Treino</button>
+        <button class="reset-btn" onclick="resetApiKey()" style="width: 100%;">Trocar Chave API</button>
     </div>
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando... (Conectando ao Gemini 3.6 Flash)</div>
+        <div id="loading">Mentalizando... (Conectando ao modelo 3.6 Flash)</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -87,11 +90,21 @@
         
         <div id="feedback-area" class="feedback hidden"></div>
     </div>
+
+    <div class="card hidden" id="history-panel">
+        <h2>Histórico Recente</h2>
+        <div id="history-list" style="margin-top: 15px; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+            <!-- O histórico será injetado aqui -->
+        </div>
+        <button class="btn-primary" onclick="closeHistory()" style="margin-top: 20px;">Voltar ao Jogo</button>
+        <button class="reset-btn" onclick="clearHistory()" style="width: 100%;">Limpar Histórico</button>
+    </div>
 </div>
 
 <script>
     let currentChallenge = null;
     let scores = { hits: 0, misses: 0, reveals: 0 };
+    let matchHistory = [];
 
     window.onload = () => {
         const savedKey = localStorage.getItem('gemini_api_key');
@@ -100,6 +113,7 @@
             showGame();
         }
         loadScores();
+        loadHistory();
     };
 
     function saveApiKey() {
@@ -117,13 +131,26 @@
         document.getElementById('config-panel').classList.remove('hidden');
         document.getElementById('score-panel').classList.add('hidden');
         document.getElementById('game-panel').classList.add('hidden');
+        document.getElementById('history-panel').classList.add('hidden');
         document.getElementById('api-key').value = '';
     }
 
     function showGame() {
         document.getElementById('config-panel').classList.add('hidden');
+        document.getElementById('history-panel').classList.add('hidden');
         document.getElementById('score-panel').classList.remove('hidden');
         document.getElementById('game-panel').classList.remove('hidden');
+    }
+
+    function showHistory() {
+        document.getElementById('score-panel').classList.add('hidden');
+        document.getElementById('game-panel').classList.add('hidden');
+        document.getElementById('history-panel').classList.remove('hidden');
+        renderHistory();
+    }
+
+    function closeHistory() {
+        showGame();
     }
 
     function loadScores() {
@@ -139,6 +166,59 @@
         localStorage.setItem('trident_scores', JSON.stringify(scores));
     }
 
+    function loadHistory() {
+        const savedHistory = JSON.parse(localStorage.getItem('trident_history'));
+        if (savedHistory) matchHistory = savedHistory;
+    }
+
+    function saveToHistory(challenge, guess, status) {
+        matchHistory.unshift({
+            palavra: challenge.palavra_mestre,
+            pista1: challenge.pista_1,
+            pista2: challenge.pista_2,
+            item: challenge.item_categoria,
+            palpite: guess || "-",
+            status: status,
+            data: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' - ' + new Date().toLocaleDateString('pt-BR')
+        });
+        
+        if (matchHistory.length > 50) {
+            matchHistory.pop(); // Mantém apenas os 50 mais recentes para não pesar o navegador
+        }
+        
+        localStorage.setItem('trident_history', JSON.stringify(matchHistory));
+    }
+
+    function clearHistory() {
+        if(confirm("Tem certeza que deseja apagar todo o histórico de treinos?")) {
+            matchHistory = [];
+            localStorage.removeItem('trident_history');
+            renderHistory();
+        }
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('history-list');
+        if (matchHistory.length === 0) {
+            list.innerHTML = '<div style="text-align: center; color: #a8a8b3; padding: 20px;">Nenhum treino registrado ainda.</div>';
+            return;
+        }
+        
+        list.innerHTML = matchHistory.map(h => {
+            let cor = h.status === 'hit' ? 'var(--success)' : (h.status === 'miss' ? 'var(--danger)' : 'var(--warning)');
+            let icone = h.status === 'hit' ? '🎯' : (h.status === 'miss' ? '❌' : '👁️');
+            
+            return `<div style="background: #323238; padding: 12px; border-radius: 8px; border-left: 5px solid ${cor}; font-size: 14px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <strong style="color: white;">${icone} Alvo: ${h.palavra.toUpperCase()}</strong>
+                    <span style="font-size: 11px; color: #a8a8b3;">${h.data}</span>
+                </div>
+                <div style="color: #e1e1e6; margin-bottom: 5px;">Seu palpite: <strong>${h.palpite.toUpperCase()}</strong></div>
+                <div style="font-size: 13px; color: #a8a8b3;"><em>Pistas: ${h.item.toUpperCase()} | ${h.pista1.toUpperCase()} | ${h.pista2.toUpperCase()}</em></div>
+            </div>`;
+        }).join('');
+    }
+
     function normalizeString(str) {
         if (!str) return "";
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -150,7 +230,7 @@
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'Mentalizando... (Conectando ao modelo 3.6 Flash)';
+        document.getElementById('loading').innerText = 'Mentalizando... (Conectando à IA)';
         document.getElementById('guess-input').value = '';
 
         try {
@@ -176,7 +256,6 @@
 
         let response;
         try {
-            // CONEXÃO DIRETA COM O MODELO GEMINI 3.6 FLASH NA API OFICIAL (v1)
             response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -248,10 +327,12 @@
         
         if (guess === answer) {
             scores.hits++;
+            saveToHistory(currentChallenge, guess, 'hit');
             feedback.style.backgroundColor = 'rgba(4, 211, 97, 0.2)';
             feedback.innerHTML = `<h3 style="color: var(--success);">🎯 Sensacional! Você acertou.</h3>`;
         } else {
             scores.misses++;
+            saveToHistory(currentChallenge, guess, 'miss');
             feedback.style.backgroundColor = 'rgba(226, 88, 88, 0.2)';
             feedback.innerHTML = `<h3 style="color: var(--danger);">❌ Incorreto.</h3>`;
         }
@@ -264,6 +345,7 @@
 
     function revealAnswer() {
         scores.reveals++;
+        saveToHistory(currentChallenge, null, 'reveal');
         updateScoreBoard();
         
         const feedback = document.getElementById('feedback-area');
