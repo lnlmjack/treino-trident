@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (OpenRouter)</title>
+    <title>Treinamento TRIDENT (OpenRouter Estável)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -77,7 +77,7 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando (Via OpenRouter)...</div>
+        <div id="loading">Mentalizando (Via Llama 3)...</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -252,7 +252,7 @@
                     'X-Title': 'Treino Trident App'
                 },
                 body: JSON.stringify({
-                    model: "google/gemini-1.5-flash:free", // Servidor estático gratuito e ultra-rápido do OpenRouter
+                    model: "meta-llama/llama-3-8b-instruct:free", // Modelo 100% gratuito e inquebrável do OpenRouter
                     messages: [
                         { role: "system", content: "Retorne estritamente um JSON limpo, sem marcações Markdown, crases ou explicações extras." },
                         { role: "user", content: prompt }
