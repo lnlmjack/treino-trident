@@ -77,7 +77,7 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Recarregando Cartucho da IA... (Pode levar uns segundos)</div>
+        <div id="loading">Mentalizando...</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
@@ -104,9 +104,6 @@
     let currentChallenge = null;
     let scores = { hits: 0, misses: 0, reveals: 0 };
     let matchHistory = [];
-    
-    // O SEGREDO: O Cartucho de desafios invisível
-    let challengeBuffer = [];
 
     window.onload = () => {
         const savedKey = localStorage.getItem('gemini_api_key');
@@ -135,7 +132,6 @@
         document.getElementById('game-panel').classList.add('hidden');
         document.getElementById('history-panel').classList.add('hidden');
         document.getElementById('api-key').value = '';
-        challengeBuffer = []; // Esvazia o cartucho ao trocar a chave
     }
 
     function showGame() {
@@ -222,25 +218,16 @@
     }
 
     async function generateChallenge() {
+        const apiKey = localStorage.getItem('gemini_api_key');
         document.getElementById('btn-generate').classList.add('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('loading').innerText = 'Buscando objeto inédito...';
         document.getElementById('guess-input').value = '';
 
-        // Se tem bala no cartucho, atira instantaneamente
-        if (challengeBuffer.length > 0) {
-            currentChallenge = challengeBuffer.pop();
-            displayChallenge(currentChallenge);
-            return;
-        }
-
-        // Se o cartucho tá vazio, pede pro Google carregar 5 de uma vez
-        const apiKey = localStorage.getItem('gemini_api_key');
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'Criando novas mágicas... (Isso evita bloqueios de cota)';
-
         try {
-            await fetchBatchChallenges(apiKey);
+            await fetchChallengeWithValidation(apiKey, 0);
         } catch (error) {
             console.error(error);
             alert(error.message.replace("Error: ", ""));
@@ -249,32 +236,46 @@
         }
     }
 
-    async function fetchBatchChallenges(apiKey) {
-        // Pede 5 desafios completos EM UMA ÚNICA REQUISIÇÃO
-        const prompt = `Atue como um espectador de mentalismo. Eu preciso de 5 desafios completamente diferentes, com palavras muito variadas (não use espelho, nem relógio).
+    // O parâmetro 'retries' garante que o sistema NÃO faça loops infinitos se a IA errar.
+    async function fetchChallengeWithValidation(apiKey, retries) {
         
-        Gere ESTRITAMENTE um ARRAY JSON contendo 5 objetos. Cada objeto deve ter este formato em português:
-        {
-            "palavra_mestre": "Um substantivo simples/objeto",
-            "categoria": "A categoria",
-            "item_categoria": "Outro objeto da mesma categoria",
-            "pista_1": "Palavra interessante que comece ESTRITAMENTE com a PRIMEIRA letra da palavra_mestre",
-            "pista_2": "Palavra muito curta que comece ESTRITAMENTE com a SEGUNDA letra da palavra_mestre"
-        }
-        
-        Não retorne absolutamente nada além do array JSON estrito (sem crases, sem introdução).`;
+        const categoriasIneditas = [
+            "Instrumentos Musicais", "Ferramentas Manuais", "Objetos de Praia", "Material Escolar",
+            "Móveis Rústicos", "Utensílios de Cozinha", "Equipamentos Esportivos", "Maquiagem",
+            "Itens de Acampamento", "Brinquedos de Tabuleiro", "Eletrodomésticos Grandes",
+            "Roupas de Frio", "Artigos de Papelaria", "Objetos de Banheiro", "Itens de Costura"
+        ];
+        const temaSorteado = categoriasIneditas[Math.floor(Math.random() * categoriasIneditas.length)];
+        const semente = Math.floor(Math.random() * 9999999);
 
-        let response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { 
-                    response_mime_type: "application/json",
-                    temperature: 1.1 
-                }
-            })
-        });
+        const prompt = `Gere APENAS um objeto JSON em português do Brasil sobre o truque TRIDENT. Semente: ${semente}.
+        Tema OBRIGATÓRIO: ${temaSorteado}. Não use Espelho nem Relógio.
+
+        Regras estritas:
+        - "palavra_mestre": Um objeto simples desse tema.
+        - "categoria": A categoria dele.
+        - "item_categoria": Outro objeto diferente da mesma categoria.
+        - "pista_1": Uma palavra imponente que comece ESTRITAMENTE com a PRIMEIRA letra da palavra_mestre.
+        - "pista_2": Uma palavra curta que comece ESTRITAMENTE com a SEGUNDA letra da palavra_mestre.
+        
+        Retorne SOMENTE o JSON.`;
+
+        let response;
+        try {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { 
+                        response_mime_type: "application/json",
+                        temperature: 1.2 
+                    }
+                })
+            });
+        } catch (fetchError) {
+            throw new Error("Falha na internet. Verifique sua conexão.");
+        }
 
         const data = await response.json();
         
@@ -282,7 +283,7 @@
             if (data.error.message.includes("Quota exceeded for metric")) {
                 let match = data.error.message.match(/retry in ([0-9.]+)s/);
                 let tempo = match ? Math.ceil(parseFloat(match[1])) : 60;
-                throw new Error(`⚠️ Limite atingido! Aguarde ${tempo} segundos para recarregar o cartucho.`);
+                throw new Error(`⚠️ Google limitou a velocidade. Aguarde ${tempo} segundos antes de tentar de novo.`);
             }
             throw new Error(`Erro do Google: ` + data.error.message);
         }
@@ -290,38 +291,35 @@
         let jsonText = data.candidates[0].content.parts[0].text;
         jsonText = jsonText.replace(/```json/gi, '').replace(/```/gi, '').trim();
         
-        let batchData;
+        let challengeData;
         try {
-            batchData = JSON.parse(jsonText);
-            if (!Array.isArray(batchData)) {
-                batchData = [batchData]; // Se a IA teimar em mandar 1 só, a gente aceita
-            }
+            challengeData = JSON.parse(jsonText);
         } catch (parseError) {
-            return fetchBatchChallenges(apiKey); // Tenta de novo se o JSON quebrar
+            if(retries < 1) return fetchChallengeWithValidation(apiKey, retries + 1);
+            throw new Error("A IA embaralhou os dados. Clique em Gerar de novo.");
         }
 
-        // Valida as 5 palavras recebidas e guarda no cartucho as que estiverem 100% perfeitas
-        batchData.forEach(c => {
-            const pmNorm = normalizeString(c.palavra_mestre);
-            const p1Norm = normalizeString(c.pista_1);
-            const p2Norm = normalizeString(c.pista_2);
-            
-            if (pmNorm && p1Norm && p2Norm) {
-                if (p1Norm[0] === pmNorm[0] && p2Norm[0] === pmNorm[1] && normalizeString(c.item_categoria) !== pmNorm) {
-                    challengeBuffer.push(c);
-                }
+        const pmNorm = normalizeString(challengeData.palavra_mestre);
+        const p1Norm = normalizeString(challengeData.pista_1);
+        const p2Norm = normalizeString(challengeData.pista_2);
+
+        if (!pmNorm || !p1Norm || !p2Norm) {
+            if(retries < 1) return fetchChallengeWithValidation(apiKey, retries + 1);
+            throw new Error("Faltaram palavras no retorno. Tente de novo.");
+        }
+
+        // Se a IA errar as letras do TRIDENT, tenta corrigir APENAS UMA VEZ
+        if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
+            if (retries < 1) {
+                document.getElementById('loading').innerText = 'Corrigindo erro de letras da IA...';
+                return fetchChallengeWithValidation(apiKey, retries + 1);
+            } else {
+                throw new Error("A IA não conseguiu encontrar pistas com as iniciais corretas para esse tema. Clique em Gerar para tentar outro!");
             }
-        });
-
-        // Se pelo menos um desafio for válido, puxa o primeiro para a tela
-        if (challengeBuffer.length > 0) {
-            currentChallenge = challengeBuffer.pop();
-            displayChallenge(currentChallenge);
-        } else {
-            // Se as 5 mágicas vieram com erro nas letras (IA delirou muito), busca de novo
-            document.getElementById('loading').innerText = 'Corrigindo erros da IA...';
-            return fetchBatchChallenges(apiKey);
         }
+
+        currentChallenge = challengeData;
+        displayChallenge(challengeData);
     }
 
     function displayChallenge(data) {
@@ -359,15 +357,7 @@
         showBreakdown(feedback);
         updateScoreBoard();
         document.getElementById('btn-generate').classList.remove('hidden');
-        
-        // Se ainda tem bala no cartucho, o botão já sugere gerar rápido
-        if(challengeBuffer.length > 0) {
-            document.getElementById('btn-generate').innerText = "Gerar Novo (Carregamento Instantâneo ⚡)";
-        } else {
-            document.getElementById('btn-generate').innerText = "Gerar Novo Desafio";
-        }
-        
-        document.getElementById('challenge-area').add('hidden');
+        document.getElementById('challenge-area').classList.add('hidden');
     }
 
     function revealAnswer() {
@@ -382,14 +372,7 @@
         
         showBreakdown(feedback);
         document.getElementById('btn-generate').classList.remove('hidden');
-        
-        if(challengeBuffer.length > 0) {
-            document.getElementById('btn-generate').innerText = "Gerar Novo (Carregamento Instantâneo ⚡)";
-        } else {
-            document.getElementById('btn-generate').innerText = "Gerar Novo Desafio";
-        }
-        
-        document.getElementById('challenge-area').add('hidden');
+        document.getElementById('challenge-area').classList.add('hidden');
     }
 
     function showBreakdown(element) {
