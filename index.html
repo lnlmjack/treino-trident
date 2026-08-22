@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Caos Total)</title>
+    <title>Treinamento TRIDENT (Sem Interrupções)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -234,7 +234,7 @@
         try {
             localStorage.setItem('trident_history', JSON.stringify(matchHistory));
         } catch (e) {
-            console.error("Falha ao salvar histórico no navegador", e);
+            console.error("Falha ao salvar histórico", e);
         }
     }
 
@@ -276,7 +276,6 @@
                 </div>`;
             }).join('');
         } catch (error) {
-            console.error("Erro ao renderizar o histórico:", error);
             list.innerHTML = '<div style="text-align: center; color: var(--danger); padding: 20px;">Erro de memória antiga. Clique em Limpar Histórico.</div>';
         }
     }
@@ -286,16 +285,25 @@
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     }
 
-    async function generateChallenge() {
+    // Função autônoma de geração com tentativa silenciosa (auto-retry) incorporada
+    async function generateChallenge(retryCount = 0) {
         const apiKey = localStorage.getItem('openrouter_api_key');
+        const maxRetries = 3; // Limite de 3 tentativas silenciosas antes de alertar
+
         document.getElementById('btn-generate').classList.add('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'O Espectador está pensando...';
+        
+        // Mensagem dinâmica para mostrar que o app está reagindo nos bastidores
+        if(retryCount === 0) {
+            document.getElementById('loading').innerText = 'O Espectador está pensando...';
+        } else {
+            document.getElementById('loading').innerText = 'Corrigindo a lógica do espectador...';
+        }
+        
         document.getElementById('guess-input').value = '';
 
-        // Lista de categorias brutalmente expandida para gerar diversidade
         const categoriasComuns = [
             "Utensílios de Cozinha", "Material Escolar", "Roupas ou Calçados",
             "Móveis de Casa", "Eletrodomésticos", "Ferramentas Comuns",
@@ -308,20 +316,18 @@
         const temaSorteado = categoriasComuns[Math.floor(Math.random() * categoriasComuns.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        // Prompt com instrução severa anti-óbvio e temperatura mais alta
-        const prompt = `Atue como um espectador leigo participando do truque TRIDENT. Semente hiper-aleatória: ${semente}.
-        Tema OBRIGATÓRIO: ${temaSorteado}. Pense como uma pessoa comum no Brasil. PROIBIDO usar palavras poéticas, complexas ou raras. PROIBIDO usar Espelho ou Relógio.
+        const prompt = `Atue como um espectador leigo no Brasil participando do truque TRIDENT. Semente: ${semente}.
+        Tema OBRIGATÓRIO: ${temaSorteado}. Pense em objetos de SEGUNDO ESCALÃO (fuja do mais óbvio!), mas que qualquer brasileiro conheça.
 
-        REGRA DE CRIATIVIDADE: FUJA DA RESPOSTA ÓBVIA! Não escolha o primeiro objeto ou a primeira palavra que vem à mente. Exemplo: se o tema for Fruta, não use maçã, use abacaxi. Escolha objetos comuns, mas de segundo pensamento.
-
-        Siga ESTRITAMENTE as regras do script:
-        1. "palavra_mestre": Um único objeto físico que você consiga visualizar, pertencente à categoria sorteada. Fuja da resposta óbvia!
-        2. "categoria": A categoria (${temaSorteado}).
-        3. "item_categoria": Outro objeto físico diferente, mas da mesma categoria.
-        4. "pista_1": Uma palavra "interessante" (de uso MUITO COMUM no Brasil) que comece ESTRITAMENTE com a PRIMEIRA LETRA da palavra_mestre.
-        5. "pista_2": Uma palavra "breve" (2 a 4 letras no máximo), extremamente comum, que comece ESTRITAMENTE com a SEGUNDA LETRA da palavra_mestre.
+        REGRAS VITAIS DE LETRAS (SE ERRAR, O TRUQUE ACABA):
+        1. "palavra_mestre": Um objeto físico real da categoria sorteada. (Ex: se for animal, não use cachorro, use tartaruga).
+        2. "categoria": ${temaSorteado}.
+        3. "item_categoria": Outro objeto físico diferente da mesma categoria.
+        4. "pista_1": Uma palavra comum no Brasil (adjetivo ou substantivo) que OBRIGATORIAMENTE comece com a PRIMEIRA LETRA da palavra_mestre.
+        5. "pista_2": Uma palavra curta (2 a 4 letras) que OBRIGATORIAMENTE comece com a SEGUNDA LETRA da palavra_mestre.
         
-        RETORNE APENAS O JSON LIMPO. NENHUM TEXTO ADICIONAL.`;
+        EXEMPLO: Se a palavra for 'MESA', a pista_1 DEVE começar com 'M' e a pista_2 DEVE começar com 'E'.
+        RETORNE APENAS O JSON LIMPO.`;
 
         try {
             const response = await fetch(`https://openrouter.ai/api/v1/chat/completions`, {
@@ -335,10 +341,10 @@
                 body: JSON.stringify({
                     model: "openrouter/auto",
                     messages: [
-                        { role: "system", content: "Retorne estritamente um JSON limpo. Use linguagem comum, mas com seleções criativas e não óbvias." },
+                        { role: "system", content: "Retorne estritamente um JSON limpo e respeite obrigatoriamente as letras iniciais das pistas." },
                         { role: "user", content: prompt }
                     ],
-                    temperature: 1.0 // Retornamos para 1.0 para forçar a criatividade da IA
+                    temperature: 0.8 // Balanceado: criativo, mas sem perder a capacidade ortográfica
                 })
             });
 
@@ -357,11 +363,19 @@
             const p1Norm = normalizeString(challengeData.pista_1);
             const p2Norm = normalizeString(challengeData.pista_2);
 
+            // Verificação de erro da IA
             if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
-                alert("A IA gerou palavras incompatíveis. Pressione Enter para rolar uma nova tentativa.");
-                document.getElementById('btn-generate').classList.remove('hidden');
-                document.getElementById('loading').style.display = 'none';
-                return;
+                if (retryCount < maxRetries) {
+                    console.warn(`IA errou as letras na tentativa ${retryCount + 1}. Tentando novamente em silêncio...`);
+                    // Se falhar, chama a própria função de novo sem alertar o usuário
+                    return generateChallenge(retryCount + 1);
+                } else {
+                    // Só alerta se esgotar as 3 tentativas secretas
+                    alert("A IA teve um lapso de criatividade profundo. Pressione Enter para rolar uma nova rodada do zero.");
+                    document.getElementById('btn-generate').classList.remove('hidden');
+                    document.getElementById('loading').style.display = 'none';
+                    return;
+                }
             }
 
             currentChallenge = challengeData;
@@ -381,8 +395,7 @@
         
         let clues = [data.item_categoria, data.pista_1, data.pista_2];
         
-        // NOVO: Algoritmo Fisher-Yates para embaralhamento perfeito
-        // Isso garante que a palavra da categoria nunca tenha preferência de posição
+        // Algoritmo de embaralhamento seguro Fisher-Yates
         for (let i = clues.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [clues[i], clues[j]] = [clues[j], clues[i]];
@@ -447,8 +460,8 @@
                 <strong>Palavra-Mestre:</strong> ${c.palavra_mestre.toUpperCase()} <br><br>
                 <strong>Lógica (Script TRIDENT):</strong><br>
                 • <em>Categoria (${c.categoria}):</em> ${c.item_categoria}<br>
-                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Interessante/Comum):</em> ${c.pista_1}<br>
-                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Breve/Curta):</em> ${c.pista_2}
+                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Pista Longa/Comum):</em> ${c.pista_1}<br>
+                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Pista Curta):</em> ${c.pista_2}
             </div>
         `;
     }
