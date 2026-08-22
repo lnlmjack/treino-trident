@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Produção)</title>
+    <title>Treinamento TRIDENT (Final)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -117,7 +117,6 @@
         loadHistory();
     };
 
-    // CONTROLE GLOBAL DO ENTER (Sem precisar focar botões)
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             const gamePanel = document.getElementById('game-panel');
@@ -125,12 +124,10 @@
             const btnGenerate = document.getElementById('btn-generate');
 
             if (!gamePanel.classList.contains('hidden')) {
-                // Se está adivinhando, Enter confirma palpite
                 if (!challengeArea.classList.contains('hidden')) {
                     e.preventDefault();
                     checkGuess();
                 } 
-                // Se já revelou, Enter gera a próxima rodada
                 else if (!btnGenerate.classList.contains('hidden')) {
                     e.preventDefault();
                     generateChallenge();
@@ -172,7 +169,6 @@
         showGame();
     }
 
-    // NOVA FUNÇÃO: ZERAR PLACAR
     function resetScores() {
         if(confirm("Tem certeza que deseja zerar os contadores de acertos e erros?")) {
             scores = { hits: 0, misses: 0, reveals: 0 };
@@ -202,14 +198,15 @@
         localStorage.setItem('trident_scores', JSON.stringify(scores));
     }
 
-    // CORREÇÃO DO HISTÓRICO: Previne falhas por dados corrompidos na memória
     function loadHistory() {
         try {
             const savedHistory = JSON.parse(localStorage.getItem('trident_history'));
-            if (Array.isArray(savedHistory)) {
+            // Validação estrita para evitar carregar arrays antigos corrompidos
+            if (Array.isArray(savedHistory) && savedHistory.length > 0 && typeof savedHistory[0].palavra !== 'undefined') {
                 matchHistory = savedHistory;
             } else {
                 matchHistory = [];
+                localStorage.removeItem('trident_history');
             }
         } catch (e) {
             matchHistory = [];
@@ -250,24 +247,41 @@
         }
     }
 
+    // FUNÇÃO BLINDADA: Nunca vai travar a tela mesmo se tiver dado corrompido
     function renderHistory() {
         const list = document.getElementById('history-list');
-        if (matchHistory.length === 0) {
+        
+        if (!matchHistory || matchHistory.length === 0) {
             list.innerHTML = '<div style="text-align: center; color: #a8a8b3; padding: 20px;">Nenhum treino registrado ainda.</div>';
             return;
         }
-        list.innerHTML = matchHistory.map(h => {
-            let cor = h.status === 'hit' ? 'var(--success)' : (h.status === 'miss' ? 'var(--danger)' : 'var(--warning)');
-            let icone = h.status === 'hit' ? '🎯' : (h.status === 'miss' ? '❌' : '👁️');
-            return `<div style="background: #323238; padding: 12px; border-radius: 8px; border-left: 5px solid ${cor}; font-size: 14px; text-align: left;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <strong style="color: white;">${icone} Alvo: ${h.palavra.toUpperCase()}</strong>
-                    <span style="font-size: 11px; color: #a8a8b3;">${h.data}</span>
-                </div>
-                <div style="color: #e1e1e6; margin-bottom: 5px;">Seu palpite: <strong>${h.palpite.toUpperCase()}</strong></div>
-                <div style="font-size: 13px; color: #a8a8b3;"><em>Pistas: ${h.item.toUpperCase()} | ${h.pista1.toUpperCase()} | ${h.pista2.toUpperCase()}</em></div>
-            </div>`;
-        }).join('');
+        
+        try {
+            list.innerHTML = matchHistory.map(h => {
+                let cor = h.status === 'hit' ? 'var(--success)' : (h.status === 'miss' ? 'var(--danger)' : 'var(--warning)');
+                let icone = h.status === 'hit' ? '🎯' : (h.status === 'miss' ? '❌' : '👁️');
+                
+                // Variáveis com fallback para evitar que a tela fique em branco
+                let alvo = (h.palavra || 'ERRO').toUpperCase();
+                let palpite = (h.palpite || '-').toUpperCase();
+                let pistaItem = (h.item || '-').toUpperCase();
+                let pista1 = (h.pista1 || '-').toUpperCase();
+                let pista2 = (h.pista2 || '-').toUpperCase();
+                let dataStr = h.data || '';
+
+                return `<div style="background: #323238; padding: 12px; border-radius: 8px; border-left: 5px solid ${cor}; font-size: 14px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <strong style="color: white;">${icone} Alvo: ${alvo}</strong>
+                        <span style="font-size: 11px; color: #a8a8b3;">${dataStr}</span>
+                    </div>
+                    <div style="color: #e1e1e6; margin-bottom: 5px;">Seu palpite: <strong>${palpite}</strong></div>
+                    <div style="font-size: 13px; color: #a8a8b3;"><em>Pistas: ${pistaItem} | ${pista1} | ${pista2}</em></div>
+                </div>`;
+            }).join('');
+        } catch (error) {
+            console.error("Erro ao renderizar o histórico:", error);
+            list.innerHTML = '<div style="text-align: center; color: var(--danger); padding: 20px;">Erro de memória antiga. Clique em Limpar Histórico.</div>';
+        }
     }
 
     function normalizeString(str) {
@@ -367,7 +381,6 @@
         const listHtml = clues.map(clue => `<div class="word-item">${clue.toUpperCase()}</div>`).join('');
         document.getElementById('word-list').innerHTML = listHtml;
         
-        // Foca automaticamente no campo para já poder digitar e dar Enter
         document.getElementById('guess-input').focus();
     }
 
@@ -396,6 +409,8 @@
         updateScoreBoard();
         document.getElementById('btn-generate').classList.remove('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
+        
+        document.getElementById('btn-generate').focus();
     }
 
     function revealAnswer() {
@@ -411,6 +426,8 @@
         showBreakdown(feedback);
         document.getElementById('btn-generate').classList.remove('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
+        
+        document.getElementById('btn-generate').focus();
     }
 
     function showBreakdown(element) {
