@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Fluxo Contínuo)</title>
+    <title>Treinamento TRIDENT (Produção)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -27,7 +27,7 @@
         
         input[type="text"], input[type="password"] { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid #323238; background: #121214; color: white; font-size: 16px; margin-bottom: 15px; }
         input[type="text"]:focus { outline: 1px solid var(--primary); }
-        button { width: 100%; padding: 15px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: transition: 0.2s; margin-bottom: 10px; color: white; }
+        button { width: 100%; padding: 15px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 10px; color: white; }
         .btn-primary { background-color: var(--primary); }
         .btn-primary:hover { background-color: var(--primary-hover); }
         .btn-secondary { background-color: #323238; }
@@ -45,6 +45,8 @@
         .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; text-align: center; }
         .feedback-breakdown { font-size: 14px; color: #a8a8b3; margin-top: 10px; text-align: left; line-height: 1.6; }
         .reset-btn { background: none; color: #a8a8b3; border: 1px solid #323238; font-size: 12px; padding: 8px; margin-top: 10px; cursor: pointer; }
+        .reset-danger { color: var(--danger); border-color: var(--danger); }
+        .reset-danger:hover { background-color: rgba(226, 88, 88, 0.1); }
     </style>
 </head>
 <body>
@@ -72,19 +74,20 @@
             </div>
         </div>
         <button class="btn-secondary" onclick="showHistory()" style="margin-top: 15px;">📜 Ver Histórico</button>
+        <button class="reset-btn reset-danger" onclick="resetScores()" style="width: 100%;">Zerar Placar</button>
         <button class="reset-btn" onclick="resetApiKey()" style="width: 100%;">Trocar Chave API</button>
     </div>
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">Mentalizando (Procurando Modelo Livre)...</div>
+        <div id="loading">O Espectador está pensando...</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
             <div class="word-list" id="word-list"></div>
             
-            <input type="text" id="guess-input" placeholder="Qual é a Palavra-Mestre?">
-            <button class="btn-success" onclick="checkGuess()">Confirmar Palpite (Ou Enter)</button>
+            <input type="text" id="guess-input" placeholder="Qual é a Palavra-Mestre? (Aperte Enter)">
+            <button class="btn-success" onclick="checkGuess()">Confirmar Palpite</button>
             <button class="btn-warning" onclick="revealAnswer()">Não sei (Revelar)</button>
         </div>
         
@@ -95,7 +98,7 @@
         <h2>Histórico Recente</h2>
         <div id="history-list" style="margin-top: 15px; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;"></div>
         <button class="btn-primary" onclick="closeHistory()" style="margin-top: 20px;">Voltar ao Jogo</button>
-        <button class="reset-btn" onclick="clearHistory()" style="width: 100%;">Limpar Histórico</button>
+        <button class="reset-btn reset-danger" onclick="clearHistory()" style="width: 100%;">Limpar Histórico</button>
     </div>
 </div>
 
@@ -114,24 +117,23 @@
         loadHistory();
     };
 
-    // Controle global do Enter para fluxo contínuo
+    // CONTROLE GLOBAL DO ENTER (Sem precisar focar botões)
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             const gamePanel = document.getElementById('game-panel');
             const challengeArea = document.getElementById('challenge-area');
             const btnGenerate = document.getElementById('btn-generate');
 
-            // Só atua se o painel de jogo estiver na tela
             if (!gamePanel.classList.contains('hidden')) {
-                // Se a área do desafio está visível, o Enter confirma o palpite
+                // Se está adivinhando, Enter confirma palpite
                 if (!challengeArea.classList.contains('hidden')) {
+                    e.preventDefault();
                     checkGuess();
-                    e.preventDefault();
                 } 
-                // Se o desafio já foi resolvido e o botão gerar está visível, o Enter cria nova rodada
+                // Se já revelou, Enter gera a próxima rodada
                 else if (!btnGenerate.classList.contains('hidden')) {
-                    generateChallenge();
                     e.preventDefault();
+                    generateChallenge();
                 }
             }
         }
@@ -170,12 +172,25 @@
         showGame();
     }
 
+    // NOVA FUNÇÃO: ZERAR PLACAR
+    function resetScores() {
+        if(confirm("Tem certeza que deseja zerar os contadores de acertos e erros?")) {
+            scores = { hits: 0, misses: 0, reveals: 0 };
+            updateScoreBoard();
+        }
+    }
+
     function loadScores() {
         try {
             const savedScores = JSON.parse(localStorage.getItem('trident_scores'));
-            if (savedScores && typeof savedScores.hits === 'number') scores = savedScores;
+            if (savedScores && typeof savedScores.hits === 'number') {
+                scores = savedScores;
+            } else {
+                scores = { hits: 0, misses: 0, reveals: 0 };
+            }
         } catch (e) {
-            localStorage.removeItem('trident_scores'); // Limpa cache corrompido
+            scores = { hits: 0, misses: 0, reveals: 0 };
+            localStorage.removeItem('trident_scores');
         }
         updateScoreBoard();
     }
@@ -187,16 +202,24 @@
         localStorage.setItem('trident_scores', JSON.stringify(scores));
     }
 
+    // CORREÇÃO DO HISTÓRICO: Previne falhas por dados corrompidos na memória
     function loadHistory() {
         try {
             const savedHistory = JSON.parse(localStorage.getItem('trident_history'));
-            if (Array.isArray(savedHistory)) matchHistory = savedHistory;
+            if (Array.isArray(savedHistory)) {
+                matchHistory = savedHistory;
+            } else {
+                matchHistory = [];
+            }
         } catch (e) {
-            localStorage.removeItem('trident_history'); // Limpa cache corrompido
+            matchHistory = [];
+            localStorage.removeItem('trident_history'); 
         }
     }
 
     function saveToHistory(challenge, guess, status) {
+        if (!challenge) return;
+        
         const now = new Date();
         const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
         
@@ -209,12 +232,18 @@
             status: status,
             data: timeString
         });
+        
         if (matchHistory.length > 50) matchHistory.pop(); 
-        localStorage.setItem('trident_history', JSON.stringify(matchHistory));
+        
+        try {
+            localStorage.setItem('trident_history', JSON.stringify(matchHistory));
+        } catch (e) {
+            console.error("Falha ao salvar histórico no navegador", e);
+        }
     }
 
     function clearHistory() {
-        if(confirm("Tem certeza que deseja apagar todo o histórico?")) {
+        if(confirm("Tem certeza que deseja apagar todo o histórico de treinos registrados?")) {
             matchHistory = [];
             localStorage.removeItem('trident_history');
             renderHistory();
@@ -264,12 +293,11 @@
         const temaSorteado = categoriasComuns[Math.floor(Math.random() * categoriasComuns.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        // Prompt totalmente alinhado com o script original do TRIDENT e exigindo vocabulário leigo
         const prompt = `Atue como um espectador leigo participando do truque TRIDENT. Semente: ${semente}.
         Tema: ${temaSorteado}. Pense como uma pessoa comum do dia a dia no Brasil. PROIBIDO usar palavras poéticas, complexas ou raras. PROIBIDO usar Espelho ou Relógio.
 
-        Siga ESTRITAMENTE as regras do script do truque:
-        1. "palavra_mestre": Um único objeto físico que você consiga visualizar, pertencente à categoria sorteada. Algo muito popular e comum.
+        Siga ESTRITAMENTE as regras do script:
+        1. "palavra_mestre": Um único objeto físico que você consiga visualizar, pertencente à categoria sorteada. Algo popular e comum.
         2. "categoria": A categoria (${temaSorteado}).
         3. "item_categoria": Outro objeto físico diferente, mas da mesma categoria.
         4. "pista_1": Uma palavra "interessante" (pode ser um adjetivo ou substantivo, mas de uso MUITO COMUM no Brasil) que comece ESTRITAMENTE com a PRIMEIRA LETRA da palavra_mestre.
@@ -292,7 +320,7 @@
                         { role: "system", content: "Retorne estritamente um JSON limpo. Use linguagem comum e natural." },
                         { role: "user", content: prompt }
                     ],
-                    temperature: 0.7 // Reduzido para evitar que a IA viaje na maionese e invente palavras estranhas
+                    temperature: 0.7
                 })
             });
 
@@ -312,7 +340,7 @@
             const p2Norm = normalizeString(challengeData.pista_2);
 
             if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
-                alert("O espectador gerou pistas fora do padrão. Clique em Gerar Novo Desafio para outra tentativa.");
+                alert("O espectador gerou pistas fora do padrão. Pressione Enter para tentar outra vez.");
                 document.getElementById('btn-generate').classList.remove('hidden');
                 document.getElementById('loading').style.display = 'none';
                 return;
@@ -339,7 +367,7 @@
         const listHtml = clues.map(clue => `<div class="word-item">${clue.toUpperCase()}</div>`).join('');
         document.getElementById('word-list').innerHTML = listHtml;
         
-        // Foca automaticamente no campo de palpite
+        // Foca automaticamente no campo para já poder digitar e dar Enter
         document.getElementById('guess-input').focus();
     }
 
@@ -368,9 +396,6 @@
         updateScoreBoard();
         document.getElementById('btn-generate').classList.remove('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
-        
-        // Foca no botão de gerar para que o usuário possa apertar Enter novamente
-        document.getElementById('btn-generate').focus();
     }
 
     function revealAnswer() {
@@ -386,9 +411,6 @@
         showBreakdown(feedback);
         document.getElementById('btn-generate').classList.remove('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
-        
-        // Foca no botão de gerar para que o usuário possa apertar Enter novamente
-        document.getElementById('btn-generate').focus();
     }
 
     function showBreakdown(element) {
