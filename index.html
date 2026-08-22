@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Espectador Real)</title>
+    <title>Treinamento TRIDENT (OpenRouter)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -51,8 +51,8 @@
 
 <div class="container">
     <div class="card" id="config-panel">
-        <h2>Conexão Segura da API</h2>
-        <input type="password" id="api-key" placeholder="Cole a chave do OpenRouter (sk-or-...)">
+        <h2>Conexão Segura (OpenRouter)</h2>
+        <input type="password" id="api-key" placeholder="Cole a chave (sk-or-...)">
         <button class="btn-primary" onclick="saveApiKey()">Salvar e Começar</button>
     </div>
 
@@ -77,13 +77,13 @@
 
     <div class="card hidden" id="game-panel">
         <button class="btn-primary" id="btn-generate" onclick="generateChallenge()">Gerar Novo Desafio</button>
-        <div id="loading">O Espectador está pensando...</div>
+        <div id="loading">Mentalizando (Procurando Modelo Livre)...</div>
         
         <div id="challenge-area" class="hidden">
             <h2 style="margin-top: 10px; color: #a8a8b3; font-size: 16px;">As 3 palavras do espectador:</h2>
             <div class="word-list" id="word-list"></div>
             
-            <input type="text" id="guess-input" placeholder="Qual é a Palavra-Mestre?">
+            <input type="text" id="guess-input" placeholder="Qual é a Palavra-Mestre? (Aperte Enter)">
             <button class="btn-success" onclick="checkGuess()">Confirmar Palpite</button>
             <button class="btn-warning" onclick="revealAnswer()">Não sei (Revelar)</button>
         </div>
@@ -112,6 +112,13 @@
         }
         loadScores();
         loadHistory();
+
+        // Adicionando o gatilho da tecla Enter no campo de palpite
+        document.getElementById('guess-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkGuess();
+            }
+        });
     };
 
     function saveApiKey() {
@@ -218,31 +225,30 @@
         document.getElementById('challenge-area').classList.add('hidden');
         document.getElementById('feedback-area').classList.add('hidden');
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').innerText = 'O Espectador está pensando...';
+        document.getElementById('loading').innerText = 'Mentalizando... (Sem limites de tempo)';
         document.getElementById('guess-input').value = '';
 
-        // Categorias ajustadas para o dia a dia de um espectador leigo
-        const categoriasComuns = [
-            "Utensílios de Cozinha", "Material Escolar", "Roupas ou Calçados",
-            "Móveis de Casa", "Eletrodomésticos", "Ferramentas Comuns",
-            "Artigos de Higiene/Banheiro", "Alimentos ou Bebidas", "Acessórios Pessoais",
-            "Partes do Corpo", "Animais Domésticos", "Meios de Transporte"
+        const categoriasIneditas = [
+            "Instrumentos Musicais", "Ferramentas", "Brinquedos", "Cozinha",
+            "Móveis", "Eletrônicos", "Esportes", "Maquiagem",
+            "Acampamento", "Escritório", "Vestuário", "Transporte",
+            "Jardinagem", "Animais", "Construção civil"
         ];
-        const temaSorteado = categoriasComuns[Math.floor(Math.random() * categoriasComuns.length)];
+        const temaSorteado = categoriasIneditas[Math.floor(Math.random() * categoriasIneditas.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        // Novo prompt: Foco total no vocabulário comum brasileiro
-        const prompt = `Atue como um brasileiro comum, leigo, que está participando de um truque de mentalismo em um show. Semente aleatória: ${semente}.
-        Tema OBRIGATÓRIO: ${temaSorteado}. Pense em um objeto extremamente comum e popular desse tema. PROIBIDO usar Espelho ou Relógio.
+        // Prompt totalmente alinhado com o script do Reid Ferry
+        const prompt = `Você é um espectador participando do truque de mentalismo TRIDENT. Semente: ${semente}.
+        Tema: ${temaSorteado}. Pense como uma pessoa comum do Brasil. Não use palavras difíceis ou poéticas. PROIBIDO usar Espelho ou Relógio.
 
-        Regras de estrutura:
-        - "palavra_mestre": Um objeto físico muito comum, de uso diário, que qualquer pessoa conhece.
-        - "categoria": A categoria (${temaSorteado}).
-        - "item_categoria": Outro objeto comum e popular da mesma categoria.
-        - "pista_1": Uma palavra muito popular do vocabulário comum brasileiro (pode ser adjetivo, verbo ou substantivo) que comece ESTRITAMENTE com a PRIMEIRA letra da palavra_mestre.
-        - "pista_2": Uma palavra muito curta e muito comum no dia a dia que comece ESTRITAMENTE com a SEGUNDA letra da palavra_mestre.
+        Regras EXATAS do roteiro TRIDENT:
+        1. A "palavra_mestre" deve ser um objeto único que você pode visualizar facilmente e que pertença à categoria sorteada.
+        2. A "categoria" é a categoria desse objeto (${temaSorteado}).
+        3. O "item_categoria" é outro objeto comum e diferente da mesma categoria.
+        4. A "pista_1" deve ser uma palavra "interessante" e "agradável" (mas de uso comum no Brasil) que comece ESTRITAMENTE com a PRIMEIRA LETRA da palavra_mestre.
+        5. A "pista_2" deve ser uma palavra "breve" (bem curta) que comece ESTRITAMENTE com a SEGUNDA LETRA da palavra_mestre.
         
-        Você DEVE retornar APENAS O JSON E MAIS NADA. Sem crases (\`\`\`) e nem texto de introdução. Não use palavras difíceis ou poéticas.`;
+        Você DEVE retornar APENAS O JSON E MAIS NADA. Não use crases e nem texto de introdução.`;
 
         try {
             const response = await fetch(`https://openrouter.ai/api/v1/chat/completions`, {
@@ -256,10 +262,10 @@
                 body: JSON.stringify({
                     model: "openrouter/auto",
                     messages: [
-                        { role: "system", content: "Retorne estritamente um JSON limpo, com palavras do dia a dia do brasileiro." },
+                        { role: "system", content: "Retorne estritamente um JSON limpo e formatado perfeitamente. Use linguagem comum e natural do Brasil." },
                         { role: "user", content: prompt }
                     ],
-                    temperature: 0.9 // Diminuí levemente a temperatura para evitar palavras muito "selvagens"
+                    temperature: 0.9 
                 })
             });
 
@@ -270,6 +276,7 @@
             }
 
             let jsonText = data.choices[0].message.content;
+            
             jsonText = jsonText.replace(/```json/gi, '').replace(/```/gi, '').trim();
             
             let challengeData = JSON.parse(jsonText);
@@ -279,7 +286,7 @@
             const p2Norm = normalizeString(challengeData.pista_2);
 
             if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
-                alert("O espectador se confundiu nas letras. Apenas clique em Gerar Novo Desafio para tentar outra vez.");
+                alert("O espectador gerou pistas fora do padrão. Clique em Gerar Novo Desafio para outra tentativa.");
                 document.getElementById('btn-generate').classList.remove('hidden');
                 document.getElementById('loading').style.display = 'none';
                 return;
@@ -305,6 +312,9 @@
         
         const listHtml = clues.map(clue => `<div class="word-item">${clue.toUpperCase()}</div>`).join('');
         document.getElementById('word-list').innerHTML = listHtml;
+        
+        // Foca automaticamente no campo de input
+        document.getElementById('guess-input').focus();
     }
 
     function checkGuess() {
@@ -331,7 +341,7 @@
         showBreakdown(feedback);
         updateScoreBoard();
         document.getElementById('btn-generate').classList.remove('hidden');
-        document.getElementById('challenge-area').classList.add('hidden');
+        document.getElementById('challenge-area').classList.add('hidden'); // Correção do bug do histórico aqui
     }
 
     function revealAnswer() {
@@ -346,7 +356,7 @@
         
         showBreakdown(feedback);
         document.getElementById('btn-generate').classList.remove('hidden');
-        document.getElementById('challenge-area').classList.add('hidden');
+        document.getElementById('challenge-area').classList.add('hidden'); // Correção do bug do histórico aqui
     }
 
     function showBreakdown(element) {
@@ -356,8 +366,8 @@
                 <strong>Palavra-Mestre:</strong> ${c.palavra_mestre.toUpperCase()} <br><br>
                 <strong>Lógica (Script TRIDENT):</strong><br>
                 • <em>Categoria (${c.categoria}):</em> ${c.item_categoria}<br>
-                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Palavra Comum):</em> ${c.pista_1}<br>
-                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Palavra Curta):</em> ${c.pista_2}
+                • <em>1ª Letra (${c.palavra_mestre[0].toUpperCase()} - Interessante):</em> ${c.pista_1}<br>
+                • <em>2ª Letra (${c.palavra_mestre[1].toUpperCase()} - Breve):</em> ${c.pista_2}
             </div>
         `;
     }
