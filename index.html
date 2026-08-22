@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Final)</title>
+    <title>Treinamento TRIDENT (Caos Total)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -201,7 +201,6 @@
     function loadHistory() {
         try {
             const savedHistory = JSON.parse(localStorage.getItem('trident_history'));
-            // Validação estrita para evitar carregar arrays antigos corrompidos
             if (Array.isArray(savedHistory) && savedHistory.length > 0 && typeof savedHistory[0].palavra !== 'undefined') {
                 matchHistory = savedHistory;
             } else {
@@ -247,7 +246,6 @@
         }
     }
 
-    // FUNÇÃO BLINDADA: Nunca vai travar a tela mesmo se tiver dado corrompido
     function renderHistory() {
         const list = document.getElementById('history-list');
         
@@ -261,7 +259,6 @@
                 let cor = h.status === 'hit' ? 'var(--success)' : (h.status === 'miss' ? 'var(--danger)' : 'var(--warning)');
                 let icone = h.status === 'hit' ? '🎯' : (h.status === 'miss' ? '❌' : '👁️');
                 
-                // Variáveis com fallback para evitar que a tela fique em branco
                 let alvo = (h.palavra || 'ERRO').toUpperCase();
                 let palpite = (h.palpite || '-').toUpperCase();
                 let pistaItem = (h.item || '-').toUpperCase();
@@ -298,24 +295,31 @@
         document.getElementById('loading').innerText = 'O Espectador está pensando...';
         document.getElementById('guess-input').value = '';
 
+        // Lista de categorias brutalmente expandida para gerar diversidade
         const categoriasComuns = [
             "Utensílios de Cozinha", "Material Escolar", "Roupas ou Calçados",
             "Móveis de Casa", "Eletrodomésticos", "Ferramentas Comuns",
-            "Artigos de Banheiro", "Alimentos", "Acessórios Pessoais",
-            "Animais Domésticos", "Meios de Transporte"
+            "Artigos de Banheiro", "Alimentos e Bebidas", "Acessórios Pessoais",
+            "Animais Domésticos", "Meios de Transporte", "Instrumentos Musicais",
+            "Profissões", "Brinquedos Clássicos", "Frutas e Legumes", 
+            "Material de Construção", "Artigos de Praia", "Material de Escritório", 
+            "Objetos de Decoração", "Artigos Esportivos", "Produtos de Limpeza"
         ];
         const temaSorteado = categoriasComuns[Math.floor(Math.random() * categoriasComuns.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        const prompt = `Atue como um espectador leigo participando do truque TRIDENT. Semente: ${semente}.
-        Tema: ${temaSorteado}. Pense como uma pessoa comum do dia a dia no Brasil. PROIBIDO usar palavras poéticas, complexas ou raras. PROIBIDO usar Espelho ou Relógio.
+        // Prompt com instrução severa anti-óbvio e temperatura mais alta
+        const prompt = `Atue como um espectador leigo participando do truque TRIDENT. Semente hiper-aleatória: ${semente}.
+        Tema OBRIGATÓRIO: ${temaSorteado}. Pense como uma pessoa comum no Brasil. PROIBIDO usar palavras poéticas, complexas ou raras. PROIBIDO usar Espelho ou Relógio.
+
+        REGRA DE CRIATIVIDADE: FUJA DA RESPOSTA ÓBVIA! Não escolha o primeiro objeto ou a primeira palavra que vem à mente. Exemplo: se o tema for Fruta, não use maçã, use abacaxi. Escolha objetos comuns, mas de segundo pensamento.
 
         Siga ESTRITAMENTE as regras do script:
-        1. "palavra_mestre": Um único objeto físico que você consiga visualizar, pertencente à categoria sorteada. Algo popular e comum.
+        1. "palavra_mestre": Um único objeto físico que você consiga visualizar, pertencente à categoria sorteada. Fuja da resposta óbvia!
         2. "categoria": A categoria (${temaSorteado}).
         3. "item_categoria": Outro objeto físico diferente, mas da mesma categoria.
-        4. "pista_1": Uma palavra "interessante" (pode ser um adjetivo ou substantivo, mas de uso MUITO COMUM no Brasil) que comece ESTRITAMENTE com a PRIMEIRA LETRA da palavra_mestre.
-        5. "pista_2": Uma palavra "breve" (muito curta, 2 a 4 letras no máximo), extremamente comum, que comece ESTRITAMENTE com a SEGUNDA LETRA da palavra_mestre.
+        4. "pista_1": Uma palavra "interessante" (de uso MUITO COMUM no Brasil) que comece ESTRITAMENTE com a PRIMEIRA LETRA da palavra_mestre.
+        5. "pista_2": Uma palavra "breve" (2 a 4 letras no máximo), extremamente comum, que comece ESTRITAMENTE com a SEGUNDA LETRA da palavra_mestre.
         
         RETORNE APENAS O JSON LIMPO. NENHUM TEXTO ADICIONAL.`;
 
@@ -331,10 +335,10 @@
                 body: JSON.stringify({
                     model: "openrouter/auto",
                     messages: [
-                        { role: "system", content: "Retorne estritamente um JSON limpo. Use linguagem comum e natural." },
+                        { role: "system", content: "Retorne estritamente um JSON limpo. Use linguagem comum, mas com seleções criativas e não óbvias." },
                         { role: "user", content: prompt }
                     ],
-                    temperature: 0.7
+                    temperature: 1.0 // Retornamos para 1.0 para forçar a criatividade da IA
                 })
             });
 
@@ -354,7 +358,7 @@
             const p2Norm = normalizeString(challengeData.pista_2);
 
             if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
-                alert("O espectador gerou pistas fora do padrão. Pressione Enter para tentar outra vez.");
+                alert("A IA gerou palavras incompatíveis. Pressione Enter para rolar uma nova tentativa.");
                 document.getElementById('btn-generate').classList.remove('hidden');
                 document.getElementById('loading').style.display = 'none';
                 return;
@@ -376,7 +380,13 @@
         document.getElementById('challenge-area').classList.remove('hidden');
         
         let clues = [data.item_categoria, data.pista_1, data.pista_2];
-        clues.sort(() => Math.random() - 0.5);
+        
+        // NOVO: Algoritmo Fisher-Yates para embaralhamento perfeito
+        // Isso garante que a palavra da categoria nunca tenha preferência de posição
+        for (let i = clues.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [clues[i], clues[j]] = [clues[j], clues[i]];
+        }
         
         const listHtml = clues.map(clue => `<div class="word-item">${clue.toUpperCase()}</div>`).join('');
         document.getElementById('word-list').innerHTML = listHtml;
