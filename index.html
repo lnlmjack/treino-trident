@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Powered by Groq)</title>
+    <title>Treinamento TRIDENT (Groq)</title>
     <style>
         :root {
             --bg-color: #121214;
             --panel-bg: #202024;
             --text-color: #e1e1e6;
-            --primary: #f55036; /* Cor da Groq para dar estilo */
+            --primary: #f55036;
             --primary-hover: #ff7056;
             --success: #04d361;
             --danger: #e25858;
@@ -51,8 +51,8 @@
 
 <div class="container">
     <div class="card" id="config-panel">
-        <h2>Configuração da API (GROQ)</h2>
-        <input type="password" id="api-key" placeholder="Cole sua chave da GROQ aqui">
+        <h2>Configuração da API (Groq)</h2>
+        <input type="password" id="api-key" placeholder="Cole sua chave da Groq (gsk_...) aqui">
         <button class="btn-primary" onclick="saveApiKey()">Salvar e Começar</button>
     </div>
 
@@ -224,25 +224,25 @@
         const categoriasIneditas = [
             "Instrumentos Musicais", "Ferramentas", "Brinquedos", "Cozinha",
             "Móveis", "Eletrônicos", "Esportes", "Maquiagem",
-            "Acampamento", "Escritório", "Vestuário", "Transporte"
+            "Acampamento", "Escritório", "Vestuário", "Transporte",
+            "Jardinagem", "Animais", "Construção"
         ];
         const temaSorteado = categoriasIneditas[Math.floor(Math.random() * categoriasIneditas.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        const prompt = `Gere APENAS um objeto JSON em português do Brasil sobre o truque TRIDENT. Semente: ${semente}.
-        Tema OBRIGATÓRIO: ${temaSorteado}. Não use Espelho nem Relógio.
+        const prompt = `Gere APENAS um objeto JSON em português do Brasil sobre o truque de mentalismo TRIDENT. Semente aleatória: ${semente}.
+        Tema OBRIGATÓRIO: ${temaSorteado}. Escolha um objeto criativo desse universo. Não use Espelho nem Relógio.
 
         Regras estritas:
-        - "palavra_mestre": Um objeto simples desse tema.
-        - "categoria": A categoria dele.
+        - "palavra_mestre": Um objeto concreto desse tema.
+        - "categoria": A categoria dele (${temaSorteado}).
         - "item_categoria": Outro objeto diferente da mesma categoria.
-        - "pista_1": Uma palavra imponente que comece ESTRITAMENTE com a PRIMEIRA letra da palavra_mestre.
-        - "pista_2": Uma palavra curta que comece ESTRITAMENTE com a SEGUNDA letra da palavra_mestre.
+        - "pista_1": Uma palavra imponente ou poética que comece ESTRITAMENTE com a PRIMEIRA letra da palavra_mestre.
+        - "pista_2": Uma palavra curta/breve que comece ESTRITAMENTE com a SEGUNDA letra da palavra_mestre.
         
-        Retorne SOMENTE o JSON estrito, sem crases, marcações ou qualquer texto adicional.`;
+        Retorne SOMENTE o JSON estrito, sem crases, marcações Markdown ou qualquer outro texto.`;
 
         try {
-            // CONEXÃO EXCLUSIVA COM A GROQ (Modelo Llama 3 70B)
             const response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
                 method: 'POST',
                 headers: { 
@@ -250,13 +250,13 @@
                     'Authorization': `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
-                    model: "llama3-70b-8192",
+                    model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: "Você é um assistente que retorna EXCLUSIVAMENTE um objeto JSON válido, e absolutamente mais nenhuma palavra." },
+                        { role: "system", content: "Você é um assistente que retorna estritamente objetos JSON válidos sem formatação Markdown." },
                         { role: "user", content: prompt }
                     ],
-                    temperature: 1.0,
-                    response_format: { type: "json_object" } // Força a Groq a devolver só JSON
+                    temperature: 1.1,
+                    response_format: { type: "json_object" }
                 })
             });
 
@@ -266,7 +266,6 @@
                 throw new Error(data.error.message);
             }
 
-            // O caminho da resposta na Groq é diferente do Google
             let jsonText = data.choices[0].message.content;
             jsonText = jsonText.replace(/```json/gi, '').replace(/```/gi, '').trim();
             
@@ -276,9 +275,8 @@
             const p1Norm = normalizeString(challengeData.pista_1);
             const p2Norm = normalizeString(challengeData.pista_2);
 
-            // Validação das letras
             if (p1Norm[0] !== pmNorm[0] || p2Norm[0] !== pmNorm[1] || normalizeString(challengeData.item_categoria) === pmNorm) {
-                alert("A IA gerou as pistas com as iniciais incorretas para este tema. Por favor, clique em Gerar Novo Desafio novamente.");
+                alert("A IA gerou as pistas fora do padrão de letras para este tema. Clique em Gerar Novo Desafio para tentar outro.");
                 document.getElementById('btn-generate').classList.remove('hidden');
                 document.getElementById('loading').style.display = 'none';
                 return;
