@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Treinamento TRIDENT (Ultra Rápido)</title>
+    <title>Treinamento TRIDENT (V 1.0)</title>
     <style>
         :root {
             --bg-color: #121214;
@@ -18,6 +18,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 500px; }
+        
+        .header-title { text-align: center; margin-bottom: 20px; color: white; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .version-badge { font-size: 14px; background-color: var(--primary); padding: 4px 8px; border-radius: 6px; color: white; font-weight: bold; }
         
         .card { background-color: var(--panel-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .stats { display: flex; justify-content: space-between; margin-top: 15px; text-align: center; }
@@ -52,6 +55,11 @@
 <body>
 
 <div class="container">
+    
+    <div class="header-title">
+        TREINO TRIDENT <span class="version-badge">V 1.0</span>
+    </div>
+
     <div class="card" id="config-panel">
         <h2>Conexão Segura (OpenRouter)</h2>
         <input type="password" id="api-key" placeholder="Cole a chave (sk-or-...)">
@@ -285,10 +293,9 @@
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     }
 
-    // Função de geração otimizada para velocidade (máximo de 1 retry)
     async function generateChallenge(retryCount = 0) {
         const apiKey = localStorage.getItem('openrouter_api_key');
-        const maxRetries = 1; // Reduzido de 3 para 1 para evitar demora excessiva
+        const maxRetries = 1; 
 
         document.getElementById('btn-generate').classList.add('hidden');
         document.getElementById('challenge-area').classList.add('hidden');
@@ -315,7 +322,6 @@
         const temaSorteado = categoriasComuns[Math.floor(Math.random() * categoriasComuns.length)];
         const semente = Math.floor(Math.random() * 9999999);
 
-        // Prompt hyper-estruturado com exemplo visual para impedir que a IA erre as letras
         const prompt = `Atue como um espectador no Brasil participando do truque TRIDENT. Semente: ${semente}.
         Tema OBRIGATÓRIO: ${temaSorteado}. 
 
